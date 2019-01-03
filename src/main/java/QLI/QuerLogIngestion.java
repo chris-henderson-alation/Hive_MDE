@@ -16,12 +16,8 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.Year;
-import java.time.temporal.ChronoField;
-import java.time.temporal.TemporalAccessor;
-import java.time.temporal.TemporalField;
+import java.time.*;
+import java.time.temporal.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.Logger;
@@ -217,7 +213,11 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
 
     private State state = State.ROOT;
 
-    private final DateRange dateRange;
+    private Date current;
+    private Date earliest;
+    private Date latest;
+
+
 
     /**
      *
@@ -228,16 +228,16 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
      * @param filenameFilter A compile regular expression. Any querylog whose name matches this pattern will be ignored.
      * @param numThreads The maximum number of threads to use to conduct QLI.
      */
-    public QuerLogIngestion(HDFSClient client, LocalDate earliest, LocalDate latest, int limit, Pattern filenameFilter, int numThreads) {
+    public QuerLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter, int numThreads) {
         this.pool = Executors.newFixedThreadPool(numThreads);
         this.waitGroup = new Phaser();
         this.client = client;
-//        this.earliest = (earliest == null) ? Long.MIN_VALUE : earliest.; // We need milliseconds as this is what HDFS uses.
-//        this.latest = (latest == null) ? Long.MAX_VALUE : latest.getLong(ChronoField.MILLI_OF_SECOND); // We need milliseconds as this is what HDFS uses.
+        this.earliest = earliest == null ? Date.MIN : new Date(earliest.get(Calendar.YEAR), earliest.get(Calendar.MONTH) + 1, earliest.get(Calendar.DAY_OF_MONTH));
+        this.latest = latest == null ?  Date.MAX : new Date(latest.get(Calendar.YEAR), latest.get(Calendar.MONTH) + 1, latest.get(Calendar.DAY_OF_MONTH));
         this.limit = limit == -1 ? Long.MAX_VALUE : limit;
         this.filenameFilter = filenameFilter;
-        this.dateRange = new DateRange(earliest, latest);
         this.state = State.ROOT;
+        this.current = new Date();
     }
 
     /**
@@ -248,7 +248,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
      * @param earliest
      * @param latest
      */
-    public QuerLogIngestion(HDFSClient client, LocalDate earliest, LocalDate latest) {
+    public QuerLogIngestion(HDFSClient client, Calendar earliest, Calendar latest) {
         this(client, earliest, latest, -1, null, Runtime.getRuntime().availableProcessors());
     }
 
@@ -261,7 +261,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
      * @param latest
      * @param limit
      */
-    public QuerLogIngestion(HDFSClient client, LocalDate earliest, LocalDate latest, int limit) {
+    public QuerLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit) {
         this(client, earliest, latest, limit, null, Runtime.getRuntime().availableProcessors());
     }
 
@@ -275,7 +275,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
      * @param limit
      * @param filenameFilter A compile regular expression. Any querylog whose name matches this pattern will be ignored.
      */
-    public QuerLogIngestion(HDFSClient client, LocalDate earliest, LocalDate latest, int limit, Pattern filenameFilter) {
+    public QuerLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter) {
         this(client, earliest, latest, limit, filenameFilter, Runtime.getRuntime().availableProcessors());
     }
 
@@ -318,6 +318,19 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
             public boolean hasNext() {
                 boolean hasNext = children.hasNext();
                 if (!hasNext) {
+                    switch (self.state) {
+                        case YEAR:
+                            self.current.year = null;
+                            break;
+                        case MONTH:
+                            self.current.month = null;
+                            break;
+                        case DAY:
+                            self.current.day = null;
+                            break;
+                        case SECONDS:
+                            break;
+                    }
                     self.state = State.values()[self.state.ordinal() - 1];
                 }
                 return hasNext;
@@ -354,18 +367,53 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
             }
             switch (this.state) {
                 case YEAR:
-                    return !this.dateRange.withinYear(time);
+                    this.current.year = time;
+                    break;
                 case MONTH:
-                    return !this.dateRange.withinMonth(time);
+                    this.current.month = time;
+                    break;
                 case DAY:
-                    return !this.dateRange.withinDay(time);
+                    this.current.day = time;
+                    break;
                 case SECONDS:
-                    return !this.dateRange.withinSecond(time);
+                    break;
                 default:
                     throw new RuntimeException("asdas");
             }
+            return !(this.earliest.before(this.current) && this.latest.after(this.current));
         }
         return isNotALogFile(node) || isFilteredOut(node) || this.logLimitReached(node);
+    }
+
+//    private boolean withinYearRange() {
+//        return this.minYear<= this.current.get(Calendar.YEAR) && this.current.get(Calendar.YEAR) <= this.maxYear;
+//    }
+//
+//    private boolean withinMonthRange() {
+//        if (this.minYear == this.current.get(Calendar.YEAR)) {
+//            if (this.current.get(Calendar.MONTH) < this.minMonth) {
+//                return false;
+//            }
+//        }
+//        if (this.maxYear == this.current.get(Calendar.YEAR)) {
+//            if (this.current.get(Calendar.MONTH) > this.maxMonth) {
+//                return false;
+//            }
+//        }
+//        return this.minMonth <= this.current.get(Calendar.MONTH) && this.current.get(Calendar.MONTH) <= this.maxMonth;
+//    }
+
+    private static Calendar newRestrictedCalendar(Calendar other, int ... fields){
+        Calendar c = new GregorianCalendar(0,0,1);
+        c.setTimeZone(other.getTimeZone());
+        for (int field : fields) {
+            c.set(field, other.get(field));
+        }
+        return c;
+    }
+
+    private boolean withinDateRange() {
+        return this.current.after(this.earliest) && this.current.before(this.latest);
     }
 
     private boolean logLimitReached(FileStatus file) {

@@ -10,8 +10,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.util.*;
 
 public class QLITest {
 
@@ -21,7 +22,7 @@ public class QLITest {
 
         public TestHDFS() throws Exception {
             Configuration conf = new Configuration();
-            for (InputStream c : QLITest.getConfigs("/Users/chris.henderson/alation/externals/alation/adbc/java/src/alation/test/unit/hdfs/APIv1/data")) {
+            for (InputStream c : QLITest.getConfigs("/Users/chris.henderson/hack/Hive_MDE/data")) {
                 conf.addResource(c);
             }
             this.fs = new LocalFileSystem();
@@ -41,27 +42,31 @@ public class QLITest {
         @Override
         public Path[] roots() {
             return new Path[]{
-                    new Path("/Users/chris.henderson/alation/externals/alation/adbc/java/src/alation/test/resources/HDFS_QLI_Logs/cdh/history/done"),
-                    new Path("/Users/chris.henderson/alation/externals/alation/adbc/java/src/alation/test/resources/HDFS_QLI_Logs/hdp/mr-history/done")
+                    new Path("/Users/chris.henderson/hack/Hive_MDE/hdfs/cdh/history/done"),
+                    new Path("/Users/chris.henderson/hack/Hive_MDE/hdfs/hdp/mr-history/done")
             };
         }
     }
 
     @Test
     public void tryitout() throws Exception {
-        HDFSClient client = new HDFS(QLITest.getConfigs("/Users/chris.henderson/alation/externals/alation/adbc/java/src/alation/test/unit/hdfs/APIv1/data"));
+//        HDFSClient client = new HDFS(QLITest.getConfigs("/Users/chris.henderson/hack/Hive_MDE/data"));
 //        QuerLogIngestion qli = new QuerLogIngestion(client, null, null);
-        QuerLogIngestion qli = new QuerLogIngestion(client, LocalDate.of(2018, 12, 18), null);
-        qli.search();
-        System.out.println(qli.logs);
-        System.out.println();
+//        QuerLogIngestion qli = new QuerLogIngestion(client, LocalDate.of(2018, 12, 1), LocalDate.of(2018, 12, 2));
+//        qli.search();
+//        System.out.println(qli.logs);
+//        System.out.println();
     }
 
     @Test
     public void tryitoutLocal() throws Exception {
         HDFSClient client = new TestHDFS();
         // Nope does'nt work lol check it
-        QuerLogIngestion qli = new QuerLogIngestion(client, LocalDate.of(2018, 2, 15), null);
+        Calendar earliest = new GregorianCalendar(2018, Calendar.FEBRUARY ,15);
+        Calendar latest = new GregorianCalendar(2018, Calendar.DECEMBER, 14);
+        earliest.setTimeZone(TimeZone.getTimeZone("UTC"));
+        latest.setTimeZone(TimeZone.getTimeZone("UTC"));
+        QuerLogIngestion qli = new QuerLogIngestion(client, earliest, latest);
         qli.search();
         System.out.println(qli.logs.size());
     }
