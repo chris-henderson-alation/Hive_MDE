@@ -9,8 +9,7 @@ import org.json.simple.JSONObject;
 import org.junit.Test;
 import org.mortbay.util.ajax.JSON;
 
-import java.io.FileReader;
-import java.io.StringWriter;
+import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -101,5 +100,39 @@ public class MDETest {
         MetadataExtraction mde = new MetadataExtraction(metastore, collector, filter);
         mde.extract();
         System.out.println(writer.toString());
+    }
+
+    @Test
+    public void jakesHuge() throws Exception {
+        long startTime = System.nanoTime();
+        SchemaFilter filter = new SchemaFilter(SchemaFilter.NO_RESTRICTIONS, SchemaFilter.NO_RESTRICTIONS);
+        MetadataCollector collector = new MetadataCollector(getOut());
+        HiveMetaStoreClient metastore = HiveMetastore.connect("mduser", "hyp3rbAd",gatherConfigs("/Users/chris.henderson/hack/Hive_MDE/big"));
+        MetadataExtraction mde = new MetadataExtraction(metastore, collector, filter);
+        mde.extract();
+        long endTime = System.nanoTime();
+        long duration = (endTime - startTime);
+        System.out.println(duration / 1e9);
+    }
+
+    @Test
+    public void testChunk() {
+        List<Integer> data = Arrays.asList(1,2,3,4,5,6,7);
+        System.out.println(MetadataExtraction.chunk(data));
+    }
+
+    public static InputStream[] gatherConfigs(String dir) throws Exception {
+        File directory = new File(dir);
+        ArrayList<InputStream> streams = new ArrayList<>();
+        for (File file : directory.listFiles()) {
+            if (file.getName().endsWith(".xml")) {
+                streams.add(new FileInputStream(file));
+            }
+        }
+        return streams.toArray(new InputStream[]{});
+    }
+
+    public static Writer getOut() throws Exception {
+        return new FileWriter(new File("/tmp/out"));
     }
 }

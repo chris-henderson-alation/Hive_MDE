@@ -11,10 +11,9 @@ import org.apache.hadoop.mapreduce.Counters;
 import com.google.common.base.Strings;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
+import org.codehaus.jackson.map.ObjectMapper;
 
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.text.SimpleDateFormat;
 import java.time.*;
 import java.time.temporal.*;
@@ -217,7 +216,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
     private Date earliest;
     private Date latest;
 
-
+    public Writer out;
 
     /**
      *
@@ -298,6 +297,12 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
             this.search(r);
         }
         this.waitForCompletion();
+        try {
+            new ObjectMapper().writeValue(new PrintWriter(System.out), this.logs);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
     /**
