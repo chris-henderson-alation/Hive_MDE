@@ -10,18 +10,15 @@ import org.apache.hadoop.mapreduce.Counters;
 
 import com.google.common.base.Strings;
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 import org.codehaus.jackson.map.ObjectMapper;
 
 import java.io.*;
-import java.text.SimpleDateFormat;
-import java.time.*;
-import java.time.temporal.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.log4j.Logger;
 
 /**
  * QLI implements query log ingestion for Hive datasources. Hive is unique among our target datasources in that it is
@@ -44,9 +41,9 @@ import java.util.regex.Pattern;
  *  System.out.println(qli.apiExceptions);
  *  System.out.println(qli.ioExceptions);
  */
-public class QuerLogIngestion extends Searcher<FileStatus> {
+public class QueryLogIngestion extends Searcher<FileStatus> {
 
-    private static final Logger LOGGER = Logger.getLogger(QuerLogIngestion.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(QueryLogIngestion.class.getName());
 
     /**
      * remoteExceptions is a collection of all of the RemoteExcepctions that occurred during QLI.
@@ -227,7 +224,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
      * @param filenameFilter A compile regular expression. Any querylog whose name matches this pattern will be ignored.
      * @param numThreads The maximum number of threads to use to conduct QLI.
      */
-    public QuerLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter, int numThreads) {
+    public QueryLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter, int numThreads) {
         this.pool = Executors.newFixedThreadPool(numThreads);
         this.waitGroup = new Phaser();
         this.client = client;
@@ -237,6 +234,12 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
         this.filenameFilter = filenameFilter;
         this.state = State.ROOT;
         this.current = new Date();
+
+        LOGGER.info("maximum thread count is " + numThreads);
+        LOGGER.info("earliest acceptable timestamp is " + this.earliest.constructDateString());
+        LOGGER.info("latest acceptable timestamp is " + this.latest.constructDateString());
+        LOGGER.info("log limit is " + this.limit);
+        LOGGER.info(this.filenameFilter == null ? "no filename filter provided" : "filename filter is " + this.filenameFilter.pattern());
     }
 
     /**
@@ -247,7 +250,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
      * @param earliest
      * @param latest
      */
-    public QuerLogIngestion(HDFSClient client, Calendar earliest, Calendar latest) {
+    public QueryLogIngestion(HDFSClient client, Calendar earliest, Calendar latest) {
         this(client, earliest, latest, -1, null, Runtime.getRuntime().availableProcessors());
     }
 
@@ -260,7 +263,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
      * @param latest
      * @param limit
      */
-    public QuerLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit) {
+    public QueryLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit) {
         this(client, earliest, latest, limit, null, Runtime.getRuntime().availableProcessors());
     }
 
@@ -274,11 +277,11 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
      * @param limit
      * @param filenameFilter A compile regular expression. Any querylog whose name matches this pattern will be ignored.
      */
-    public QuerLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter) {
+    public QueryLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter) {
         this(client, earliest, latest, limit, filenameFilter, Runtime.getRuntime().availableProcessors());
     }
 
-    public QuerLogIngestion(HDFSClient client) {
+    public QueryLogIngestion(HDFSClient client) {
         this(client, null, null);
     }
 
@@ -291,14 +294,20 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
      * @param root the root directory of the search.
      */
     public void search() {
+        int prev = this.logs.size();
         for (Path root : this.client.roots()) {
+            LOGGER.info("Searching through " + root.toString() + " ...");
             FileStatus r = new FileStatus();
             r.setPath(root);
             this.search(r);
+            LOGGER.info("Found " + (this.logs.size() - prev) + " new logs in " + root.toString());
+            prev = this.logs.size();
         }
         this.waitForCompletion();
+        LOGGER.info(this.ioExceptions);
+        LOGGER.info(this.remoteExceptions);
         try {
-            new ObjectMapper().writeValue(new PrintWriter(System.out), this.logs);
+            new ObjectMapper().writeValue(this.out, this.logs);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -317,7 +326,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
     public Iterator<FileStatus> children(final FileStatus node) {
         this.state = State.values()[this.state.ordinal() + 1];
         Iterator<FileStatus> children = Arrays.asList(this.listStatus(node.getPath())).iterator();
-        QuerLogIngestion self = this;
+        QueryLogIngestion self = this;
         return new Iterator<FileStatus>() {
             @Override
             public boolean hasNext() {
@@ -367,7 +376,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
             try {
                 time = Integer.parseInt(node.getPath().getName());
             } catch (Throwable e) {
-                LOGGER.warning("Found an unexpected directory, " + node.getPath().getName());
+                LOGGER.warn("Found an unexpected directory, " + node.getPath().getName());
                 return true;
             }
             switch (this.state) {
@@ -385,44 +394,22 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
                 default:
                     throw new RuntimeException("asdas");
             }
-            return !(this.earliest.before(this.current) && this.latest.after(this.current));
+
+            boolean rejected = !(this.earliest.before(this.current) && this.latest.after(this.current));
+            LOGGER.debug("Directory " + this.current.constructDateString() + " was " + (rejected ? "rejected" : "accepted"));
+            return rejected;
         }
-        return isNotALogFile(node) || isFilteredOut(node) || this.logLimitReached(node);
-    }
-
-//    private boolean withinYearRange() {
-//        return this.minYear<= this.current.get(Calendar.YEAR) && this.current.get(Calendar.YEAR) <= this.maxYear;
-//    }
-//
-//    private boolean withinMonthRange() {
-//        if (this.minYear == this.current.get(Calendar.YEAR)) {
-//            if (this.current.get(Calendar.MONTH) < this.minMonth) {
-//                return false;
-//            }
-//        }
-//        if (this.maxYear == this.current.get(Calendar.YEAR)) {
-//            if (this.current.get(Calendar.MONTH) > this.maxMonth) {
-//                return false;
-//            }
-//        }
-//        return this.minMonth <= this.current.get(Calendar.MONTH) && this.current.get(Calendar.MONTH) <= this.maxMonth;
-//    }
-
-    private static Calendar newRestrictedCalendar(Calendar other, int ... fields){
-        Calendar c = new GregorianCalendar(0,0,1);
-        c.setTimeZone(other.getTimeZone());
-        for (int field : fields) {
-            c.set(field, other.get(field));
-        }
-        return c;
-    }
-
-    private boolean withinDateRange() {
-        return this.current.after(this.earliest) && this.current.before(this.latest);
+        boolean rejected =  isNotALogFile(node) || isFilteredOut(node) || this.logLimitReached(node);
+        LOGGER.debug("File " + node.getPath() + " was " + (rejected ? "rejected" : "accepted"));;
+        return rejected;
     }
 
     private boolean logLimitReached(FileStatus file) {
-        return this.getQueryLog(extractJobID(file)) == null;
+        if (this.getQueryLog(extractJobID(file)) == null) {
+            LOGGER.info("Log limit reached at " + file.getPath());
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -439,6 +426,7 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
         if (leaf.isDirectory()) {
             return false;
         }
+        LOGGER.debug("parsing " + leaf.getPath());
         // This is the one spot where we utilize the thread pool.
         // Parsing a file incurs its download, which can be expensive.
         this.execute(() -> this.parse(leaf));
@@ -573,7 +561,8 @@ public class QuerLogIngestion extends Searcher<FileStatus> {
         job.addResource(is);
         try {
             // Only the configuration has the session ID, the job history does not seem to.
-            ql.setSessionId(job.get("hive.session.id"));
+                    //fs.adl.oauth2.client.id
+            ql.setSessionId(job.get("hive.session.id") == null ? job.get("fs.adl.oauth2.client.id") : job.get("hive.session.id"));
             // This is the query string text. Equivalent to the JHIST workflowName.
             ql.setText(job.get("hive.query.string"));
             // The database queried.

@@ -12,7 +12,7 @@ import java.util.List;
 
 public class MetadataExtraction {
 
-    public static final int MAX_TABLE_QUERY_SIZE = 1000;
+    public static final int MAX_TABLE_QUERY_SIZE = 10000;
 
     public HiveMetaStoreClient metastore;
     public MetadataCollector collector;

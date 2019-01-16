@@ -1,5 +1,9 @@
 package QLI;
 
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 public class Date {
 
     public Integer year = null;
@@ -41,12 +45,14 @@ public class Date {
             date.append(this.year);
         }
         if (other.month != null) {
+            date.append("/");
             if (this.month < 10) {
                 date.append(0);
             }
             date.append(this.month);
         }
         if (other.day != null) {
+            date.append("/");
             if (this.day < 10) {
                 date.append(0);
             }

@@ -18,12 +18,23 @@ public class HiveMetastore {
         return new HiveMetaStoreClient(newConf(configurations));
     }
 
+    public static HiveMetaStoreClient connect(String username, InputStream ... configurations) throws MetaException {
+        HiveConf conf = newConf(configurations);
+        conf.set(HiveConf.ConfVars.METASTORE_CONNECTION_USER_NAME.toString(), username);
+        return new HiveMetaStoreClient(conf);
+    }
+
     public static HiveMetaStoreClient connect(String username, String password, InputStream ... configurations) throws MetaException, LoginException, IOException {
         HiveConf conf = newConf(configurations);
-        // You really do have to do this before constructing the Metastore client as the Metastore client DOES
-        // attempt tp connect upon construction.
-        UserGroupInformation.setConfiguration(conf);
-        UserGroupInformation.loginUserFromSubject(Kerberos.kinit(username, password).getSubject());
+        switch (conf.get("hadoop.security.authentication")) {
+            case "kerberos":
+                UserGroupInformation.loginUserFromSubject(Kerberos.kinit(username, password));
+                break;
+            case "simple":
+                conf.set(HiveConf.ConfVars.METASTORE_CONNECTION_USER_NAME.toString(), username);
+                conf.set(HiveConf.ConfVars.METASTOREPWD.toString(), password);
+                break;
+        }
         return new HiveMetaStoreClient(conf);
     }
 

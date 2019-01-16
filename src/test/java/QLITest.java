@@ -1,17 +1,16 @@
 import QLI.HDFS;
 import QLI.HDFSClient;
-import QLI.QuerLogIngestion;
+import QLI.QueryLog;
+import QLI.QueryLogIngestion;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.Test;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URI;
-import java.time.Instant;
-import java.time.LocalDate;
 import java.util.*;
 
 public class QLITest {
@@ -42,8 +41,9 @@ public class QLITest {
         @Override
         public Path[] roots() {
             return new Path[]{
-                    new Path("/Users/chris.henderson/hack/Hive_MDE/hdfs/cdh/history/done"),
-                    new Path("/Users/chris.henderson/hack/Hive_MDE/hdfs/hdp/mr-history/done")
+//                    new Path("/Users/chris.henderson/hack/Hive_MDE/hdfs/cdh/history/done"),
+//                    new Path("/Users/chris.henderson/hack/Hive_MDE/hdfs/hdp/mr-history/done"),
+                    new Path("/Users/chris.henderson/hack/Hive_MDE/hdfs/mr-history/done")
             };
         }
     }
@@ -51,8 +51,8 @@ public class QLITest {
     @Test
     public void tryitout() throws Exception {
 //        HDFSClient client = new HDFS(QLITest.getConfigs("/Users/chris.henderson/hack/Hive_MDE/data"));
-//        QuerLogIngestion qli = new QuerLogIngestion(client, null, null);
-//        QuerLogIngestion qli = new QuerLogIngestion(client, LocalDate.of(2018, 12, 1), LocalDate.of(2018, 12, 2));
+//        QueryLogIngestion qli = new QueryLogIngestion(client, null, null);
+//        QueryLogIngestion qli = new QueryLogIngestion(client, LocalDate.of(2018, 12, 1), LocalDate.of(2018, 12, 2));
 //        qli.search();
 //        System.out.println(qli.logs);
 //        System.out.println();
@@ -62,28 +62,63 @@ public class QLITest {
     public void tryitoutLocal() throws Exception {
         HDFSClient client = new TestHDFS();
         // Nope does'nt work lol check it
-        Calendar earliest = new GregorianCalendar(2018, Calendar.FEBRUARY ,15);
-        Calendar latest = new GregorianCalendar(2018, Calendar.DECEMBER, 14);
-        earliest.setTimeZone(TimeZone.getTimeZone("UTC"));
-        latest.setTimeZone(TimeZone.getTimeZone("UTC"));
-        QuerLogIngestion qli = new QuerLogIngestion(client, earliest, latest);
+//        Calendar earliest = new GregorianCalendar(2018, Calendar.FEBRUARY ,15);
+//        Calendar latest = new GregorianCalendar(2018, Calendar.DECEMBER, 15);
+//        earliest.setTimeZone(TimeZone.getTimeZone("UTC"));
+//        latest.setTimeZone(TimeZone.getTimeZone("UTC"));
+//        QueryLogIngestion qli = new QueryLogIngestion(client, earliest, latest);
+        QueryLogIngestion qli = new QueryLogIngestion(client);
+        Writer lol = new StringWriter();
+        qli.out = lol;
         qli.search();
         System.out.println(qli.logs.size());
+        System.out.println(qli.remoteExceptions.size());
+        for (QueryLog q : qli.logs) {
+            if (q.getSessionId() == null) {
+                System.out.println("lol");
+            }
+        }
+        System.out.println(lol.toString());
     }
 
     public static InputStream[] getConfigs(String path) throws Exception {
-        File[] files = new File(path).listFiles();
-        if (files == null) {
-            throw new IOException("hate you, hate your both");
-        }
-        ArrayList<InputStream> confs = new ArrayList<InputStream>();
-        for (File file : files) {
-            if (!file.getAbsolutePath().endsWith(".xml")) {
-                continue;
-            }
-            confs.add(new FileInputStream(file));
-        }
-        return confs.toArray(new InputStream[]{});
+        return command.configs(path);
+    }
+
+    @Test
+    public void fuck() throws Exception {
+        InputStream[] configs = command.configs("/Users/chris.henderson/hack/Hive_MDE/matrix/knox");
+        HDFSClient c = new HDFS("hive", configs);
+        QueryLogIngestion qli = new QueryLogIngestion(c);
+        Logger.getRootLogger().setLevel(Level.DEBUG);
+        qli.search();
+        System.out.println(qli.logs.size());
+        System.out.println(qli.remoteExceptions.size());
+    }
+
+    @Test
+    public void fuckme() throws Exception {
+        InputStream[] configs = command.configs("/Users/chris.henderson/hack/Hive_MDE/matrix/knoxKerberos");
+        HDFSClient c = new HDFS("mduser", "hyp3rbAd", configs);
+        QueryLogIngestion qli = new QueryLogIngestion(c);
+        Logger.getRootLogger().setLevel(Level.DEBUG);
+        qli.search();
+        System.out.println(qli.logs.size());
+        System.out.println(qli.remoteExceptions);
+        System.out.println(qli.ioExceptions);
+    }
+
+    @Test
+    public void knox() throws Exception {
+        InputStream[] configs = command.configs("/Users/chris.henderson/hack/Hive_MDE/matrix/jakes");
+        HDFSClient c = new HDFS("mduser", "hyp3rbAd", configs);
+        QueryLogIngestion qli = new QueryLogIngestion(c);
+        Logger.getRootLogger().setLevel(Level.INFO);
+        qli.out = new StringWriter();
+        qli.search();
+        System.out.println(qli.logs.size());
+        System.out.println(qli.remoteExceptions);
+        System.out.println(qli.ioExceptions);
     }
 
 }

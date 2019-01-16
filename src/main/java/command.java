@@ -4,18 +4,21 @@ import MDE.MetadataExtraction;
 import MDE.SchemaFilter;
 import QLI.HDFS;
 import QLI.HDFSClient;
-import QLI.QuerLogIngestion;
+import QLI.QueryLogIngestion;
+import kerberos.Kerberos;
 import org.apache.commons.cli.*;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
-import sun.rmi.runtime.Log;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import javax.security.auth.login.LoginException;
 import java.io.*;
 import java.util.ArrayList;
 
 public class command {
+
+    private static final Logger LOGGER = Logger.getLogger(command.class.getName());
 
     private enum Mode {
         MDE,
@@ -24,30 +27,46 @@ public class command {
 
     private static final Options options;
     private static final String MDE = "m";
+    private static final String MDE_LONG = "mde";
     private static final String QLI = "q";
+    private static final String QLI_LONG = "qli";
     private static final String OUT = "o";
     private static final String CONFIG_DIRECTORY = "d";
+    private static final String VERBOSE = "v";
+    private static final String VERY_VERBOSE = "vv";
+    private static final String VERY_VERY_VERBOSE = "vvv";
 
     static {
         OptionGroup mode = new OptionGroup()
-                .addOption(new Option(MDE, "mde", false,"execute Metadata Extraction"))
-                .addOption(new Option(QLI, "qli", false, "execute Querylog Ingestion"));
+                .addOption(new Option(MDE, MDE_LONG, false,"execute Metadata Extraction"))
+                .addOption(new Option(QLI, QLI_LONG, false, "execute Querylog Ingestion"));
+        OptionGroup verbosity = new OptionGroup()
+                .addOption(new Option(VERBOSE, false, "verbose logging"))
+                .addOption(new Option(VERY_VERBOSE, false, "very verbose logging"))
+                .addOption(new Option(VERY_VERY_VERBOSE, false, "very very verbose logging"));;
+        Option configDirectory = new Option(CONFIG_DIRECTORY, true, "configuration directory");
+        Option out = new Option(OUT, true, "output file, default is stdout");
+        Option username = new Option("u", true, "username");
+        Option password= new Option("p", true, "password");
+
+        configDirectory.setRequired(true);
         mode.setRequired(true);
-        Option dir = new Option(CONFIG_DIRECTORY, true, "configuration directory");
-        dir.setRequired(true);
+
         options = new Options()
-            .addOption(dir)
-            .addOption(OUT, true, "output file, default is stdout")
-            .addOptionGroup(mode)
-            .addOption("u", true, "username")
-            .addOption("p", true, "password");
+                .addOptionGroup(mode)
+                .addOptionGroup(verbosity)
+                .addOption(configDirectory)
+                .addOption(out)
+                .addOption(username)
+                .addOption(password);
     }
 
     public static void main(String ... argv) {
         CommandLine opts = parseCLI(argv);
+        verbosity(opts);
         Mode mode = mode(opts);
         Writer out = out(opts);
-        InputStream[] configurations = configs(opts);
+        InputStream[] configurations = configs(opts.getOptionValue(CONFIG_DIRECTORY));
         String username = opts.getOptionValue("u");
         String password = opts.getOptionValue("p");
         run(mode, out, configurations, username, password);
@@ -67,16 +86,29 @@ public class command {
     public static void qli(Writer out, InputStream[] configurations, String username, String password) {
         HDFSClient client;
         try {
-            client = new HDFS(username, password, configurations);
+            if (password != null) {
+                client = new HDFS(username, password, configurations);
+            } else {
+                client = new HDFS(configurations);
+            }
         } catch (LoginException | IOException | InterruptedException e) {
             System.out.println("don't feel like it yet");
             System.out.println(e.getMessage());
             System.exit(1);
             return;
         }
-        QuerLogIngestion qli = new QuerLogIngestion(client);
+        QueryLogIngestion qli = new QueryLogIngestion(client);
         qli.out = out;
         qli.search();
+        for (Exception e : qli.ioExceptions) {
+            System.out.println(e.getMessage());
+        }
+        for (Exception e : qli.remoteExceptions) {
+            System.out.println(e.getMessage());
+        }
+        if (qli.ioExceptions.size() != 0 || qli.remoteExceptions.size() != 0) {
+            System.exit(1);
+        }
     }
 
     public static void mde(Writer out, InputStream[] configurations, String username, String password) {
@@ -92,7 +124,14 @@ public class command {
             return;
         }
         try {
-            metastore = HiveMetastore.connect(username, password ,configurations);
+            if (password != null) {
+                LOGGER.info("initializing kerberos");
+                metastore = HiveMetastore.connect(username, password, configurations);
+            } else if (username != null) {
+                metastore = HiveMetastore.connect(username, configurations);
+            } else {
+                metastore = HiveMetastore.connect(configurations);
+            }
         } catch (MetaException | IOException e) {
             System.out.println("failed to initialize connection with the metastore");
             System.out.println(e.getMessage());
@@ -106,18 +145,6 @@ public class command {
         }
         MetadataExtraction mde = new MetadataExtraction(metastore, collector, filter);
         mde.extract();
-    }
-
-    public static CommandLine parseCLI(String ... argv) {
-        DefaultParser parser = new DefaultParser();
-        try {
-            return parser.parse(options, argv);
-        }
-        catch (ParseException e) {
-            System.out.println(e.getMessage());
-            System.exit(1);
-            return null;
-        }
     }
 
     public static Mode mode(CommandLine opts) {
@@ -162,25 +189,57 @@ public class command {
         }
     }
 
-    public static InputStream[] configs(CommandLine opts) {
-        if (!opts.hasOption(CONFIG_DIRECTORY)) {
-            System.out.println("configuration directory must be set");
-            System.exit(1);
-        }
-        String dir = opts.getOptionValue(CONFIG_DIRECTORY);
-        File directory = new File(dir);
+    public static InputStream[] configs(String dir) {
         ArrayList<InputStream> streams = new ArrayList<>();
+        buildConfigs(streams, dir);
+        return streams.toArray(new InputStream[]{});
+    }
+
+    public static void buildConfigs(ArrayList<InputStream> streams, String dir) {
+        File directory = new File(dir);
         for (File file : directory.listFiles()) {
+            if (file.isDirectory()) {
+                buildConfigs(streams, file.getAbsolutePath());
+                continue;
+            }
             if (file.getName().endsWith(".xml")) {
                 try {
                     streams.add(new FileInputStream(file));
-                } catch (IOException e){
+                    LOGGER.info("added config file at " + file.toString());
+                    continue;
+                } catch (IOException e) {
                     System.out.println("failed to open the config at " + file.getAbsolutePath());
                     System.out.println(e.getMessage());
                     System.exit(1);
                 }
             }
+            if (Kerberos.KRB5_CONF.equals(file.getName())) {
+                Kerberos.setKrb5Conf(file.getAbsolutePath());
+            }
         }
-        return streams.toArray(new InputStream[]{});
+    }
+
+    public static CommandLine parseCLI(String ... argv) {
+        DefaultParser parser = new DefaultParser();
+        try {
+            return parser.parse(options, argv);
+        }
+        catch (ParseException e) {
+            System.out.println(e.getMessage());
+            System.exit(1);
+            return null;
+        }
+    }
+
+    public static void verbosity(CommandLine opts) {
+        if (opts.hasOption(VERBOSE)) {
+            Logger.getRootLogger().setLevel(Level.INFO);
+        } else if (opts.hasOption(VERY_VERBOSE)) {
+            Logger.getRootLogger().setLevel(Level.DEBUG);
+        } else if (opts.hasOption((VERY_VERY_VERBOSE))) {
+            Logger.getRootLogger().setLevel(Level.TRACE);
+        } else {
+            Logger.getRootLogger().setLevel(Level.ERROR);
+        }
     }
 }
