@@ -1,5 +1,5 @@
-import QLI.HDFS;
-import QLI.HDFSClient;
+import QLI.client.HDFS;
+import QLI.client.Client;
 import QLI.QueryLog;
 import QLI.QueryLogIngestion;
 import org.apache.hadoop.conf.Configuration;
@@ -15,7 +15,7 @@ import java.util.*;
 
 public class QLITest {
 
-    public class TestHDFS implements HDFSClient {
+    public class TestHDFS implements Client {
 
         private FileSystem fs;
 
@@ -60,7 +60,7 @@ public class QLITest {
 
     @Test
     public void tryitoutLocal() throws Exception {
-        HDFSClient client = new TestHDFS();
+        Client client = new TestHDFS();
         // Nope does'nt work lol check it
 //        Calendar earliest = new GregorianCalendar(2018, Calendar.FEBRUARY ,15);
 //        Calendar latest = new GregorianCalendar(2018, Calendar.DECEMBER, 15);
@@ -87,8 +87,8 @@ public class QLITest {
 
     @Test
     public void fuck() throws Exception {
-        InputStream[] configs = command.configs("/Users/chris.henderson/hack/Hive_MDE/matrix/knox");
-        HDFSClient c = new HDFS("hive", configs);
+        String configs = "/Users/chris.henderson/hack/Hive_MDE/matrix/knox";
+        Client c = new HDFS(configs, "hive");
         QueryLogIngestion qli = new QueryLogIngestion(c);
         Logger.getRootLogger().setLevel(Level.DEBUG);
         qli.search();
@@ -98,8 +98,8 @@ public class QLITest {
 
     @Test
     public void fuckme() throws Exception {
-        InputStream[] configs = command.configs("/Users/chris.henderson/hack/Hive_MDE/matrix/knoxKerberos");
-        HDFSClient c = new HDFS("mduser", "hyp3rbAd", configs);
+        String configs = "/Users/chris.henderson/hack/Hive_MDE/matrix/knoxKerberos";
+        Client c = new HDFS(configs, "mduser", "hyp3rbAd");
         QueryLogIngestion qli = new QueryLogIngestion(c);
         Logger.getRootLogger().setLevel(Level.DEBUG);
         qli.search();
@@ -110,8 +110,21 @@ public class QLITest {
 
     @Test
     public void knox() throws Exception {
-        InputStream[] configs = command.configs("/Users/chris.henderson/hack/Hive_MDE/matrix/jakes");
-        HDFSClient c = new HDFS("mduser", "hyp3rbAd", configs);
+        String configs = "/Users/chris.henderson/hack/Hive_MDE/matrix/jakes";
+        Client c = new HDFS(configs, "mduser", "hyp3rbAd");
+        QueryLogIngestion qli = new QueryLogIngestion(c);
+        Logger.getRootLogger().setLevel(Level.INFO);
+        qli.out = new StringWriter();
+        qli.search();
+        System.out.println(qli.logs.size());
+        System.out.println(qli.remoteExceptions);
+        System.out.println(qli.ioExceptions);
+    }
+
+    @Test
+    public void azure() throws Exception {
+        String configs = "/Users/chris.henderson/hack/Hive_MDE/matrix/azure";
+        Client c = new HDFS(configs);
         QueryLogIngestion qli = new QueryLogIngestion(c);
         Logger.getRootLogger().setLevel(Level.INFO);
         qli.out = new StringWriter();

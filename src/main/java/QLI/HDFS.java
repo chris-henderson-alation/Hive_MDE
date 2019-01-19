@@ -7,16 +7,12 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
-import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import javax.security.auth.login.LoginException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URL;
 import java.util.logging.Logger;
 
 public class HDFS implements HDFSClient {
@@ -40,15 +36,6 @@ public class HDFS implements HDFSClient {
         UserGroupInformation.setConfiguration(conf);
         UserGroupInformation.loginUserFromSubject(Kerberos.kinit(username, password));
         this.fs = SWebHdfsFileSystem.get(conf);
-        LOGGER.info("the URI is... " + this.fs.getUri().toString());
-    }
-
-    public static URI getUri() {
-        try {
-            return new URI("swebhdfs://ip-10-11-21-224.alationdata.com:8443/gateway/default/webhdfs/v1/");
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     @Override

@@ -11,7 +11,7 @@ import java.io.InputStream;
 public interface HDFSClient {
 
     public FileStatus[] listStatus(Path path) throws IOException;
-    public FSDataInputStream open(Path path) throws IOException;
+    public InputStream open(Path path) throws IOException;
 
     public Path[] roots();
 

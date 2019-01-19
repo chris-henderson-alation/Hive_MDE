@@ -1,10 +1,11 @@
+import Configuration.Configuration;
 import MDE.HiveMetastore;
 import MDE.MetadataCollector;
 import MDE.MetadataExtraction;
 import MDE.SchemaFilter;
-import QLI.HDFS;
-import QLI.HDFSClient;
 import QLI.QueryLogIngestion;
+import QLI.client.Client;
+import QLI.client.ClientFactory;
 import kerberos.Kerberos;
 import org.apache.commons.cli.*;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -31,6 +32,8 @@ public class command {
     private static final String QLI = "q";
     private static final String QLI_LONG = "qli";
     private static final String OUT = "o";
+    private static final String KNOX = "k";
+    private static final String KNOX_LONG = "knox";
     private static final String CONFIG_DIRECTORY = "d";
     private static final String VERBOSE = "v";
     private static final String VERY_VERBOSE = "vv";
@@ -46,6 +49,7 @@ public class command {
                 .addOption(new Option(VERY_VERY_VERBOSE, false, "very very verbose logging"));;
         Option configDirectory = new Option(CONFIG_DIRECTORY, true, "configuration directory");
         Option out = new Option(OUT, true, "output file, default is stdout");
+        Option knox = new Option(KNOX, KNOX_LONG, true, "hostname of the Knox proxy");
         Option username = new Option("u", true, "username");
         Option password= new Option("p", true, "password");
 
@@ -57,40 +61,38 @@ public class command {
                 .addOptionGroup(verbosity)
                 .addOption(configDirectory)
                 .addOption(out)
+                .addOption(knox)
                 .addOption(username)
                 .addOption(password);
     }
 
-    public static void main(String ... argv) {
+    public static void main(String ... argv) throws Exception {
         CommandLine opts = parseCLI(argv);
         verbosity(opts);
         Mode mode = mode(opts);
         Writer out = out(opts);
-        InputStream[] configurations = configs(opts.getOptionValue(CONFIG_DIRECTORY));
+        Configuration configuration = new Configuration(opts.getOptionValue(CONFIG_DIRECTORY));
         String username = opts.getOptionValue("u");
         String password = opts.getOptionValue("p");
-        run(mode, out, configurations, username, password);
+        String knoxHostname = opts.getOptionValue(KNOX);
+        run(mode, out, configuration, username, password, knoxHostname);
     }
 
-    public static void run(Mode mode, Writer out, InputStream[] configurations, String username, String password) {
+    public static void run(Mode mode, Writer out, Configuration configuration, String username, String password, String knoxHost) throws Exception {
         switch (mode) {
             case MDE:
-                mde(out, configurations, username, password);
+                mde(out, "asd", username, password);
                 break;
             case QLI:
-                qli(out, configurations, username, password);
+                qli(out, "asd", username, password, knoxHost);
                 break;
         }
     }
 
-    public static void qli(Writer out, InputStream[] configurations, String username, String password) {
-        HDFSClient client;
+    public static void qli(Writer out, String configurations, String username, String password, String knoxHost) throws Exception {
+        Client client;
         try {
-            if (password != null) {
-                client = new HDFS(username, password, configurations);
-            } else {
-                client = new HDFS(configurations);
-            }
+            client = ClientFactory.newClient(configurations, username, password, knoxHost);
         } catch (LoginException | IOException | InterruptedException e) {
             System.out.println("don't feel like it yet");
             System.out.println(e.getMessage());
@@ -111,7 +113,7 @@ public class command {
         }
     }
 
-    public static void mde(Writer out, InputStream[] configurations, String username, String password) {
+    public static void mde(Writer out, String configurations, String username, String password) {
         SchemaFilter filter = new SchemaFilter(SchemaFilter.NO_RESTRICTIONS, SchemaFilter.NO_RESTRICTIONS);
         MetadataCollector collector;
         HiveMetaStoreClient metastore;

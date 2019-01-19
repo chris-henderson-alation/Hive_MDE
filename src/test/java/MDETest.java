@@ -22,7 +22,7 @@ public class MDETest {
         long startTime = System.nanoTime();
         SchemaFilter filter = new SchemaFilter(SchemaFilter.NO_RESTRICTIONS, SchemaFilter.NO_RESTRICTIONS);
         MetadataCollector collector = new MetadataCollector(getOut());
-        HiveMetaStoreClient metastore = HiveMetastore.connect("hive", gatherConfigs("/Users/chris.henderson/hack/Hive_MDE/big"));
+        HiveMetaStoreClient metastore = HiveMetastore.connect("hive", "/Users/chris.henderson/hack/Hive_MDE/big");
         MetadataExtraction mde = new MetadataExtraction(metastore, collector, filter);
         mde.extract();
         long endTime = System.nanoTime();
@@ -41,7 +41,7 @@ public class MDETest {
         SchemaFilter filter = new SchemaFilter(SchemaFilter.NO_RESTRICTIONS, SchemaFilter.NO_RESTRICTIONS);
         Writer out = getOut();
         MetadataCollector collector = new MetadataCollector(out);
-        HiveMetaStoreClient metastore = HiveMetastore.connect("hive",   gatherConfigs("/Users/chris.henderson/hack/Hive_MDE/matrix/knox"));
+        HiveMetaStoreClient metastore = HiveMetastore.connect("hive",   "/Users/chris.henderson/hack/Hive_MDE/matrix/knox");
         MetadataExtraction mde = new MetadataExtraction(metastore, collector, filter);
         mde.extract();
         System.out.println(out.toString());
@@ -53,7 +53,7 @@ public class MDETest {
 //        Writer out = getOut();
         Writer out = new StringWriter();
         MetadataCollector collector = new MetadataCollector(out);
-        HiveMetaStoreClient metastore = HiveMetastore.connect("mduser", "hyp3rbAd",  gatherConfigs("/Users/chris.henderson/hack/Hive_MDE/matrix/knoxKerberos"));
+        HiveMetaStoreClient metastore = HiveMetastore.connect("mduser", "hyp3rbAd", "/Users/chris.henderson/hack/Hive_MDE/matrix/knoxKerberos");
         MetadataExtraction mde = new MetadataExtraction(metastore, collector, filter);
         mde.extract();
         System.out.println(out.toString());
@@ -64,7 +64,18 @@ public class MDETest {
         SchemaFilter filter = new SchemaFilter(SchemaFilter.NO_RESTRICTIONS, SchemaFilter.NO_RESTRICTIONS);
         Writer out = new StringWriter();
         MetadataCollector collector = new MetadataCollector(out);
-        HiveMetaStoreClient metastore = HiveMetastore.connect("mduser", "hyp3rbAd",  gatherConfigs("/Users/chris.henderson/hack/Hive_MDE/matrix/jakes"));
+        HiveMetaStoreClient metastore = HiveMetastore.connect("mduser", "hyp3rbAd", "/Users/chris.henderson/hack/Hive_MDE/matrix/jakes");
+        MetadataExtraction mde = new MetadataExtraction(metastore, collector, filter);
+        mde.extract();
+        System.out.println(out.toString());
+    }
+
+    @Test
+    public void azure() throws Exception {
+        SchemaFilter filter = new SchemaFilter(SchemaFilter.NO_RESTRICTIONS, SchemaFilter.NO_RESTRICTIONS);
+        Writer out = new StringWriter();
+        MetadataCollector collector = new MetadataCollector(out);
+        HiveMetaStoreClient metastore = HiveMetastore.connect("/Users/chris.henderson/hack/Hive_MDE/matrix/azure");
         MetadataExtraction mde = new MetadataExtraction(metastore, collector, filter);
         mde.extract();
         System.out.println(out.toString());

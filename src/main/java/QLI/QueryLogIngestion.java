@@ -1,6 +1,7 @@
 package QLI;
 
 // Please see ./org/apache/hadoop/README.md for a quick explanation of these packages.
+import QLI.client.Client;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobConf;
@@ -109,7 +110,7 @@ public class QueryLogIngestion extends Searcher<FileStatus> {
      * A dependency injection of the Hadoop client to use for QLI. Implementors of this interface must be able to
      * accurately describe the GETFILESTATUS and LISTSTATUS
      */
-    private final HDFSClient client;
+    private final Client client;
 
     /**
      * Querying HDFS for directory listings isn't so bad (although we would really like a "tree" like API to speed things up),
@@ -224,7 +225,7 @@ public class QueryLogIngestion extends Searcher<FileStatus> {
      * @param filenameFilter A compile regular expression. Any querylog whose name matches this pattern will be ignored.
      * @param numThreads The maximum number of threads to use to conduct QLI.
      */
-    public QueryLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter, int numThreads) {
+    public QueryLogIngestion(Client client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter, int numThreads) {
         this.pool = Executors.newFixedThreadPool(numThreads);
         this.waitGroup = new Phaser();
         this.client = client;
@@ -250,7 +251,7 @@ public class QueryLogIngestion extends Searcher<FileStatus> {
      * @param earliest
      * @param latest
      */
-    public QueryLogIngestion(HDFSClient client, Calendar earliest, Calendar latest) {
+    public QueryLogIngestion(Client client, Calendar earliest, Calendar latest) {
         this(client, earliest, latest, -1, null, Runtime.getRuntime().availableProcessors());
     }
 
@@ -263,7 +264,7 @@ public class QueryLogIngestion extends Searcher<FileStatus> {
      * @param latest
      * @param limit
      */
-    public QueryLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit) {
+    public QueryLogIngestion(Client client, Calendar earliest, Calendar latest, int limit) {
         this(client, earliest, latest, limit, null, Runtime.getRuntime().availableProcessors());
     }
 
@@ -277,11 +278,11 @@ public class QueryLogIngestion extends Searcher<FileStatus> {
      * @param limit
      * @param filenameFilter A compile regular expression. Any querylog whose name matches this pattern will be ignored.
      */
-    public QueryLogIngestion(HDFSClient client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter) {
+    public QueryLogIngestion(Client client, Calendar earliest, Calendar latest, int limit, Pattern filenameFilter) {
         this(client, earliest, latest, limit, filenameFilter, Runtime.getRuntime().availableProcessors());
     }
 
-    public QueryLogIngestion(HDFSClient client) {
+    public QueryLogIngestion(Client client) {
         this(client, null, null);
     }
 
