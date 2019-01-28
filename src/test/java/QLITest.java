@@ -1,3 +1,5 @@
+import Configuration.AlationHiveConfiguration;
+
 import QLI.client.HDFS;
 import QLI.client.Client;
 import QLI.QueryLog;
@@ -87,7 +89,7 @@ public class QLITest {
 
     @Test
     public void fuck() throws Exception {
-        String configs = "/Users/chris.henderson/hack/Hive_MDE/matrix/knox";
+        AlationHiveConfiguration configs = new AlationHiveConfiguration("/Users/chris.henderson/hack/Hive_MDE/matrix/knox");
         Client c = new HDFS(configs, "hive");
         QueryLogIngestion qli = new QueryLogIngestion(c);
         Logger.getRootLogger().setLevel(Level.DEBUG);
@@ -98,7 +100,7 @@ public class QLITest {
 
     @Test
     public void fuckme() throws Exception {
-        String configs = "/Users/chris.henderson/hack/Hive_MDE/matrix/knoxKerberos";
+        AlationHiveConfiguration configs = new AlationHiveConfiguration("/Users/chris.henderson/hack/Hive_MDE/matrix/knoxKerberos");
         Client c = new HDFS(configs, "mduser", "hyp3rbAd");
         QueryLogIngestion qli = new QueryLogIngestion(c);
         Logger.getRootLogger().setLevel(Level.DEBUG);
@@ -110,7 +112,7 @@ public class QLITest {
 
     @Test
     public void knox() throws Exception {
-        String configs = "/Users/chris.henderson/hack/Hive_MDE/matrix/jakes";
+        AlationHiveConfiguration configs = new AlationHiveConfiguration("/Users/chris.henderson/hack/Hive_MDE/matrix/jakes");
         Client c = new HDFS(configs, "mduser", "hyp3rbAd");
         QueryLogIngestion qli = new QueryLogIngestion(c);
         Logger.getRootLogger().setLevel(Level.INFO);
@@ -123,7 +125,7 @@ public class QLITest {
 
     @Test
     public void azure() throws Exception {
-        String configs = "/Users/chris.henderson/hack/Hive_MDE/matrix/azure";
+        AlationHiveConfiguration configs = new AlationHiveConfiguration("/Users/chris.henderson/hack/Hive_MDE/matrix/azure");
         Client c = new HDFS(configs);
         QueryLogIngestion qli = new QueryLogIngestion(c);
         Logger.getRootLogger().setLevel(Level.INFO);

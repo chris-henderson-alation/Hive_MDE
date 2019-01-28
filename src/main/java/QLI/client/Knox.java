@@ -1,7 +1,7 @@
 package QLI.client;
 
-import kerberos.Kerberos;
-import org.apache.commons.httpclient.URIException;
+import Configuration.AlationHiveConfiguration;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -16,41 +16,27 @@ import org.codehaus.jackson.map.ObjectMapper;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
 
 
 public class Knox implements Client {
 
     private static final Logger LOGGER = Logger.getLogger(Knox.class.getName());
 
-    public static final String GATEWAY_PORT = "gateway.port";
-    public static final String GATEWAY_PATH = "gateway.path";
-
-
     private final Configuration conf;
     private final KnoxSession session;
 
-//    public Knox(String username, String password, InputStream ... configurations) throws Exception {
-//        this.conf = buildConf(configurations);
-//        this.session = KnoxSession.loginInsecure("https://ip-10-11-21-224.alationdata.com:8443/gateway/default", username, password);
-//    }
-
-
-    private static final Pattern KEYSTORE = Pattern.compile(".*jks");
-    private static final Pattern CONFIGS = Pattern.compile(".*xml");
-    private static final Pattern KRB5 = Pattern.compile("krb5\\.conf");
-
-    public Knox(String hostname, String username, String password, String configurationDirectory) throws URISyntaxException {
-        Map<Pattern, List<File>> m = QLI.configuration.Configuration.gather(new File(configurationDirectory), CONFIGS, KRB5);
-        if (m.get(KRB5).size() > 0) {
-            Kerberos.setKrb5Conf(m.get(KRB5).get(0).getAbsolutePath());
-        }
-        this.conf = QLI.configuration.Configuration.build(m.get(CONFIGS));
+    public Knox(
+            AlationHiveConfiguration conf,
+            String hostname,
+            String username,
+            String password) throws URISyntaxException {
+        this.conf = conf;
         this.session = KnoxSession.loginInsecure(
-                "https://" + hostname + ":" + this.conf.get(GATEWAY_PORT) + "/" + this.conf.get(GATEWAY_PATH) + "/default",
+                "https://" +
+                        hostname + ":" +
+                        conf.get("gateway.port") + "/" +
+                        conf.get("gateway.path") + "/" +
+                        conf.webhdfsClusterName(),
                 username, password);
     }
 
@@ -119,13 +105,5 @@ public class Knox implements Client {
             f.add(derp);
         }
         return f.toArray(new FileStatus[]{});
-    }
-
-    private static Configuration buildConf(InputStream[] configurations) {
-        Configuration conf = new Configuration();
-        for (InputStream configuration : configurations) {
-            conf.addResource(configuration);
-        }
-        return conf;
     }
 }

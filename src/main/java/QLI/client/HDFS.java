@@ -27,38 +27,37 @@ public class HDFS implements Client {
     private static final Pattern CONFIGS = Pattern.compile(".*\\.xml");
     private static final Pattern KRB5 = Pattern.compile("krb5\\.conf");
 
-    public HDFS(String configDirectory) throws Exception {
-        this.fs = this.initializeFilesystem(QLI.configuration.Configuration.build(QLI.configuration.Configuration.gather(new File(configDirectory), CONFIGS).get(CONFIGS)));
+//    public HDFS(String configDirectory) throws Exception {
+//        this.fs = this.initializeFilesystem(QLI.configuration.AlationHiveConfiguration.build(QLI.configuration.AlationHiveConfiguration.gather(new File(configDirectory), CONFIGS).get(CONFIGS)));
+//    }
+//
+//    public HDFS(String configDirectory, String username) throws Exception {
+//        this.fs = this.initializeFilesystem(QLI.configuration.AlationHiveConfiguration.build(QLI.configuration.AlationHiveConfiguration.gather(new File(configDirectory), CONFIGS).get(CONFIGS)), username);
+//    }
+//
+//    public HDFS(String configDirectory, String username, String password) throws Exception {
+//        Map<Pattern, List<File>> m  = QLI.configuration.AlationHiveConfiguration.gather(new File(configDirectory), CONFIGS, KRB5);
+//        if (m.get(KRB5).size() > 0) {
+//            Kerberos.setKrb5Conf(m.get(KRB5).get(0).getAbsolutePath());
+//        }
+//        AlationHiveConfiguration conf = QLI.configuration.AlationHiveConfiguration.build(QLI.configuration.AlationHiveConfiguration.gather(new File(configDirectory), CONFIGS).get(CONFIGS));
+//        UserGroupInformation.setConfiguration(conf);
+//        UserGroupInformation.loginUserFromSubject(Kerberos.kinit(username, password));
+//        this.fs = this.initializeFilesystem(conf);
+//    }
+
+    public HDFS(Configuration configuration) throws Exception {
+        this.fs = this.initializeFilesystem(configuration);
     }
 
-    public HDFS(String configDirectory, String username) throws Exception {
-        this.fs = this.initializeFilesystem(QLI.configuration.Configuration.build(QLI.configuration.Configuration.gather(new File(configDirectory), CONFIGS).get(CONFIGS)), username);
+    public HDFS(Configuration configuration, String username) throws Exception {
+        this.fs = this.initializeFilesystem(configuration, username);
     }
 
-    public HDFS(String configDirectory, String username, String password) throws Exception {
-        Map<Pattern, List<File>> m  = QLI.configuration.Configuration.gather(new File(configDirectory), CONFIGS, KRB5);
-        if (m.get(KRB5).size() > 0) {
-            Kerberos.setKrb5Conf(m.get(KRB5).get(0).getAbsolutePath());
-        }
-        Configuration conf = QLI.configuration.Configuration.build(QLI.configuration.Configuration.gather(new File(configDirectory), CONFIGS).get(CONFIGS));
-        UserGroupInformation.setConfiguration(conf);
+    public HDFS(Configuration configuration, String username, String password) throws Exception {
+        UserGroupInformation.setConfiguration(configuration);
         UserGroupInformation.loginUserFromSubject(Kerberos.kinit(username, password));
-        this.fs = this.initializeFilesystem(conf);
-    }
-
-    public HDFS(InputStream[] configurations) throws Exception {
-        this.fs = this.initializeFilesystem(buildConf(configurations));
-    }
-
-    public HDFS(InputStream[] configurations, String username) throws Exception {
-        this.fs = this.initializeFilesystem(buildConf(configurations), username);
-    }
-
-    public HDFS(InputStream[] configurations, String username, String password) throws Exception {
-        Configuration conf = buildConf(configurations);
-        UserGroupInformation.setConfiguration(conf);
-        UserGroupInformation.loginUserFromSubject(Kerberos.kinit(username, password));
-        this.fs = this.initializeFilesystem(conf);
+        this.fs = this.initializeFilesystem(configuration);
     }
 
     private FileSystem initializeFilesystem(Configuration conf) throws Exception {
@@ -96,11 +95,4 @@ public class HDFS implements Client {
         return new Path[]{new Path(this.fs.getConf().get("mapreduce.jobhistory.done-dir"))};
     }
 
-    private static Configuration buildConf(InputStream[] configurations) {
-        Configuration conf = new Configuration();
-        for (InputStream configuration : configurations) {
-            conf.addResource(configuration);
-        }
-        return conf;
-    }
 }

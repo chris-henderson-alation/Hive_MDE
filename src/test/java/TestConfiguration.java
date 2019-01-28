@@ -1,11 +1,10 @@
-import Configuration.Configuration;
+import Configuration.AlationHiveConfiguration;
 import org.junit.Test;
 
 public class TestConfiguration {
 
     @Test
     public void testConfiguration() throws Exception {
-        Configuration conf = new Configuration("/Users/chris.henderson/hack/Hive_MDE/matrix/jakes");
-        System.out.println(conf.something());
+        AlationHiveConfiguration conf = new AlationHiveConfiguration("/Users/chris.henderson/hack/Hive_MDE/matrix/jakes");
     }
 }

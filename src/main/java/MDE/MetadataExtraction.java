@@ -34,7 +34,7 @@ public class MetadataExtraction {
                     .stream()
                     .filter(this.filter::accepted)
                     .forEach(this::extractDatabase);
-        } catch (MetaException e) {
+        } catch (Exception e) {
             this.collector.fatalError(e);
         } finally {
             this.collector.finish();
@@ -44,7 +44,7 @@ public class MetadataExtraction {
     private void extractDatabase(String database) {
         try {
             this.extractTables(database, this.metastore.getAllTables(database));
-        } catch (MetaException e) {
+        } catch (Exception e) {
             this.collector.fatalError(e);
         }
 

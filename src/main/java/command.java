@@ -1,4 +1,4 @@
-import Configuration.Configuration;
+import Configuration.AlationHiveConfiguration;
 import MDE.HiveMetastore;
 import MDE.MetadataCollector;
 import MDE.MetadataExtraction;
@@ -10,11 +10,13 @@ import kerberos.Kerberos;
 import org.apache.commons.cli.*;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import javax.security.auth.login.LoginException;
 import java.io.*;
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 
 public class command {
@@ -38,6 +40,9 @@ public class command {
     private static final String VERBOSE = "v";
     private static final String VERY_VERBOSE = "vv";
     private static final String VERY_VERY_VERBOSE = "vvv";
+
+    private static final String ERROR_RENDEVOUS = "e";
+    private static final String ERROR_RENDEVOUS_LONG = "error";
 
     static {
         OptionGroup mode = new OptionGroup()
@@ -67,29 +72,30 @@ public class command {
     }
 
     public static void main(String ... argv) throws Exception {
+
         CommandLine opts = parseCLI(argv);
         verbosity(opts);
         Mode mode = mode(opts);
         Writer out = out(opts);
-        Configuration configuration = new Configuration(opts.getOptionValue(CONFIG_DIRECTORY));
+        AlationHiveConfiguration configuration = new AlationHiveConfiguration(opts.getOptionValue(CONFIG_DIRECTORY));
         String username = opts.getOptionValue("u");
         String password = opts.getOptionValue("p");
         String knoxHostname = opts.getOptionValue(KNOX);
         run(mode, out, configuration, username, password, knoxHostname);
     }
 
-    public static void run(Mode mode, Writer out, Configuration configuration, String username, String password, String knoxHost) throws Exception {
+    public static void run(Mode mode, Writer out, AlationHiveConfiguration configurations, String username, String password, String knoxHost) throws Exception {
         switch (mode) {
             case MDE:
-                mde(out, "asd", username, password);
+                mde(out, configurations, username, password, knoxHost);
                 break;
             case QLI:
-                qli(out, "asd", username, password, knoxHost);
+                qli(out, configurations, username, password, knoxHost);
                 break;
         }
     }
 
-    public static void qli(Writer out, String configurations, String username, String password, String knoxHost) throws Exception {
+    public static void qli(Writer out, AlationHiveConfiguration configurations, String username, String password, String knoxHost) throws Exception {
         Client client;
         try {
             client = ClientFactory.newClient(configurations, username, password, knoxHost);
@@ -113,7 +119,7 @@ public class command {
         }
     }
 
-    public static void mde(Writer out, String configurations, String username, String password) {
+    public static void mde(Writer out, AlationHiveConfiguration configurations, String username, String password, String knoxHostname) {
         SchemaFilter filter = new SchemaFilter(SchemaFilter.NO_RESTRICTIONS, SchemaFilter.NO_RESTRICTIONS);
         MetadataCollector collector;
         HiveMetaStoreClient metastore;
@@ -128,9 +134,9 @@ public class command {
         try {
             if (password != null) {
                 LOGGER.info("initializing kerberos");
-                metastore = HiveMetastore.connect(username, password, configurations);
+                metastore = HiveMetastore.connect(configurations, username, password);
             } else if (username != null) {
-                metastore = HiveMetastore.connect(username, configurations);
+                metastore = HiveMetastore.connect(configurations, username);
             } else {
                 metastore = HiveMetastore.connect(configurations);
             }
@@ -147,6 +153,10 @@ public class command {
         }
         MetadataExtraction mde = new MetadataExtraction(metastore, collector, filter);
         mde.extract();
+    }
+
+    public static Writer errorOut(CommandLine opts) {
+        return null;
     }
 
     public static Mode mode(CommandLine opts) {

@@ -1,6 +1,5 @@
 package QLI.client;
 
-import QLI.HDFSClient;
 import kerberos.Kerberos;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;

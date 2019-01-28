@@ -1,7 +1,8 @@
 package MDE;
 
-import QLI.configuration.Configuration;
+//import QLI.configuration.AlationHiveConfiguration;
 import kerberos.Kerberos;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStore;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -20,28 +21,26 @@ public class HiveMetastore {
 
     private static final Pattern CONFIGS = Pattern.compile(".*\\.xml");
 
-    public static HiveMetaStoreClient connect(String configurations) throws MetaException {
-        return new HiveMetaStoreClient((HiveConf)Configuration.build(Configuration.gather(new File(configurations), CONFIGS).get(CONFIGS)));
+    public static HiveMetaStoreClient connect(HiveConf configurations) throws MetaException {
+        return new HiveMetaStoreClient(configurations);
     }
 
-    public static HiveMetaStoreClient connect(String username, String configurations) throws MetaException {
-        HiveConf conf = (HiveConf) Configuration.build(Configuration.gather(new File(configurations), CONFIGS).get(CONFIGS));
-        conf.set(HiveConf.ConfVars.METASTORE_CONNECTION_USER_NAME.toString(), username);
-        return new HiveMetaStoreClient(conf);
+    public static HiveMetaStoreClient connect(HiveConf configurations, String username) throws MetaException {
+        configurations.set(HiveConf.ConfVars.METASTORE_CONNECTION_USER_NAME.toString(), username);
+        return new HiveMetaStoreClient(configurations);
     }
 
-    public static HiveMetaStoreClient connect(String username, String password, String configurations) throws MetaException, LoginException, IOException {
-        HiveConf conf = (HiveConf) Configuration.build(Configuration.gather(new File(configurations), CONFIGS).get(CONFIGS));
-        switch (conf.get("hadoop.security.authentication")) {
+    public static HiveMetaStoreClient connect(HiveConf configurations, String username, String password) throws MetaException, LoginException, IOException {
+        switch (configurations.get("hadoop.security.authentication")) {
             case "kerberos":
                 UserGroupInformation.loginUserFromSubject(Kerberos.kinit(username, password));
                 break;
             case "simple":
-                conf.set(HiveConf.ConfVars.METASTORE_CONNECTION_USER_NAME.toString(), username);
-                conf.set(HiveConf.ConfVars.METASTOREPWD.toString(), password);
+                configurations.set(HiveConf.ConfVars.METASTORE_CONNECTION_USER_NAME.toString(), username);
+                configurations.set(HiveConf.ConfVars.METASTOREPWD.toString(), password);
                 break;
         }
-        return new HiveMetaStoreClient(conf);
+        return new HiveMetaStoreClient(configurations);
     }
 
     private static HiveConf newConf(InputStream ... configurations) {
